@@ -1,0 +1,86 @@
+upstream NextCloud {
+  server 127.0.0.1:80;
+}
+
+server {
+        listen 443 ssl default;
+        listen [::]:443 ssl default;
+        server_name nextcloud.mydomain.com;
+        ssl_certificate /etc/nginx/ssl/nextcloud.pem;
+        ssl_certificate_key /etc/nginx/ssl/nextcloud.key;
+        ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+        ssl_ciphers HIGH:!NULL:!MD5;
+        access_log on;
+        proxy_buffering off;
+        proxy_set_header Referer "nextcloud.mydomain.com/nextcloud";
+        error_page 426 = @nextcloud;
+        error_page 450 = @docs;
+
+    ###########  NEXTCLOUD REDIRECT AREA ##############################################
+        #### nextcloud MAIN PROXY SCRIPT ####
+        location @nextcloud {
+            #Connect to the proxy using the server pool selected by the if statements above.
+            proxy_pass http://NextCloud;
+            proxy_redirect off;
+
+            #standard proxy settings
+            # - The first 4 lines are necessary to enable websockets (required for NOVNC to work)
+            proxy_http_version 1.1;
+            proxy_set_header Connection $http_connection;
+            proxy_set_header Origin https://$host;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Referer "https://nextcloud.mydomain.com/nextcloud";
+
+            #Additional settings not related to web sockets
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-NginX-Proxy true;
+            proxy_connect_timeout 600;
+            proxy_send_timeout 600;
+            proxy_read_timeout 600;
+            send_timeout 600;
+        }
+
+        location @docs {
+           proxy_pass http://localhost:9980;
+           proxy_set_header Upgrade $http_upgrade;
+           proxy_set_header Connection "upgrade";
+           proxy_set_header Host $http_host;
+
+        }
+    ##### These next entries are for LibreOffice Online to redirect and open files via webdav
+        location ^~ /loleaflet {
+             return 450;
+             #proxy_set_header Host $http_host;
+        }
+
+        # WOPI discovery URL
+        location ^~ /hosting/discovery {
+             return 450;
+              #proxy_pass http://localhost:9980;
+              #proxy_set_header Host $http_host;
+        }
+
+    # websockets, download, presentation and image upload
+        location ^~ /lool {
+             return 450;
+              #proxy_pass http://localhost:9980;
+              #proxy_set_header Upgrade $http_upgrade;
+              #proxy_set_header Connection "upgrade";
+              #proxy_set_header Host $http_host;
+        }
+
+    ###### Root Location - Also has an if statement in case some url for libreoffice is not caught by the above locations.
+        location / {
+           if ($uri ~ loleaflet|discovery|lool) {
+                return 450;
+           }
+           return 426;
+        }
+
+
+        #### END SCRIPT ####
+    ######################### END NEXTCLOUD SECTION #######################################
+}
+
