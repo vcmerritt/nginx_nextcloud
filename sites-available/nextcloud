@@ -13,6 +13,7 @@ server {
         access_log on;
         proxy_buffering off;
         proxy_set_header Referer "nextcloud.mydomain.com/nextcloud";
+        add_header Strict-Transport-Security "max-age=15768000; includeSubDomains; preload;";
         error_page 426 = @nextcloud;
         error_page 450 = @docs;
 
